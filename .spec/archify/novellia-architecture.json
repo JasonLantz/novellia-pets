@@ -1,0 +1,277 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Novellia Pets Architecture",
+    "quality_profile": "showcase",
+    "views": [
+      {
+        "id": "records-path",
+        "label": "Records CRUD path",
+        "focus": [
+          "owner",
+          "next",
+          "db"
+        ],
+        "note": "Server-rendered pages and route handlers read and write medical records through Drizzle."
+      },
+      {
+        "id": "chat-path",
+        "label": "Grounded AI chat path",
+        "focus": [
+          "owner",
+          "chat",
+          "core",
+          "retrieval",
+          "model",
+          "db"
+        ],
+        "note": "Chat requests are guarded, retrieval answers exact questions from SQL, and only open questions reach the local Qwen model."
+      },
+      {
+        "id": "deployment",
+        "label": "Deployment shape",
+        "focus": [
+          "registry",
+          "k8s",
+          "next"
+        ],
+        "note": "One slim standalone Docker image in a single pod; sqlite lives on a PVC, exposed via NodePort 30080 behind a Cloudflare Tunnel."
+      }
+    ]
+  },
+  "components": [
+    {
+      "id": "owner",
+      "type": "external",
+      "label": "Owner",
+      "sublabel": "Browser",
+      "pos": [
+        40,
+        130
+      ],
+      "size": [
+        130,
+        60
+      ]
+    },
+    {
+      "id": "next",
+      "type": "frontend",
+      "label": "Next.js 16",
+      "sublabel": "RSC pages + API routes",
+      "pos": [
+        330,
+        300
+      ],
+      "size": [
+        160,
+        64
+      ],
+      "tag": "standalone"
+    },
+    {
+      "id": "chat",
+      "type": "backend",
+      "label": "POST /api/chat",
+      "sublabel": "streaming UI messages",
+      "pos": [
+        330,
+        130
+      ],
+      "size": [
+        160,
+        60
+      ]
+    },
+    {
+      "id": "core",
+      "type": "backend",
+      "label": "chat-core",
+      "sublabel": "guardrail + prompt",
+      "pos": [
+        620,
+        130
+      ],
+      "size": [
+        160,
+        60
+      ]
+    },
+    {
+      "id": "model",
+      "type": "backend",
+      "label": "Qwen2.5-0.5B",
+      "sublabel": "transformers.js CPU",
+      "pos": [
+        900,
+        130
+      ],
+      "size": [
+        170,
+        60
+      ],
+      "tag": "q8_0 ONNX"
+    },
+    {
+      "id": "db",
+      "type": "database",
+      "label": "Drizzle",
+      "sublabel": "sqlite on PVC / Postgres",
+      "pos": [
+        620,
+        460
+      ],
+      "size": [
+        160,
+        60
+      ],
+      "tag": "dual dialect"
+    },
+    {
+      "id": "hf",
+      "type": "external",
+      "label": "Hugging Face",
+      "sublabel": "model weights",
+      "pos": [
+        900,
+        20
+      ],
+      "size": [
+        170,
+        54
+      ],
+      "tag": "one-time pull"
+    },
+    {
+      "id": "registry",
+      "type": "cloud",
+      "label": "Registry",
+      "sublabel": "192.168.0.25:5000",
+      "pos": [
+        40,
+        460
+      ],
+      "size": [
+        160,
+        60
+      ]
+    },
+    {
+      "id": "k8s",
+      "type": "cloud",
+      "label": "k3s",
+      "sublabel": "Deployment + NodePort 30080",
+      "pos": [
+        330,
+        460
+      ],
+      "size": [
+        160,
+        60
+      ]
+    },
+    {
+      "id": "retrieval",
+      "type": "backend",
+      "label": "retrieval",
+      "sublabel": "intent + SQL fast paths",
+      "pos": [
+        620,
+        295
+      ],
+      "size": [
+        160,
+        64
+      ],
+      "tag": "model-free"
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "novellia-pets pod (standalone image)",
+      "wraps": [
+        "next",
+        "chat",
+        "core",
+        "retrieval",
+        "model",
+        "db"
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "id": "owner-pages",
+      "from": "owner",
+      "to": "next",
+      "label": "HTTPS via tunnel",
+      "variant": "emphasis"
+    },
+    {
+      "id": "owner-chat",
+      "from": "owner",
+      "to": "chat",
+      "label": "SSE stream",
+      "variant": "emphasis"
+    },
+    {
+      "id": "pages-db",
+      "from": "next",
+      "to": "db",
+      "label": "Drizzle queries"
+    },
+    {
+      "id": "chat-core",
+      "from": "chat",
+      "to": "core",
+      "label": "answerQuestion"
+    },
+    {
+      "id": "core-retrieval",
+      "from": "core",
+      "to": "retrieval",
+      "label": "retrieve(question)",
+      "labelAt": [
+        700,
+        245
+      ]
+    },
+    {
+      "id": "retrieval-db",
+      "from": "retrieval",
+      "to": "db",
+      "label": "records + counts",
+      "labelAt": [
+        700,
+        410
+      ]
+    },
+    {
+      "id": "core-model",
+      "from": "core",
+      "to": "model",
+      "label": "stream tokens"
+    },
+    {
+      "id": "model-hf",
+      "from": "model",
+      "to": "hf",
+      "label": "weights on first chat",
+      "variant": "dashed"
+    },
+    {
+      "id": "reg-k8s",
+      "from": "registry",
+      "to": "k8s",
+      "label": "image pull"
+    },
+    {
+      "id": "k8s-next",
+      "from": "k8s",
+      "to": "next",
+      "label": "runs pod"
+    }
+  ]
+}

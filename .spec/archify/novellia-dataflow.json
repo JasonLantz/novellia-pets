@@ -1,0 +1,239 @@
+{
+  "schema_version": 1,
+  "diagram_type": "dataflow",
+  "meta": {
+    "title": "Record Retrieval Data Flow",
+    "quality_profile": "showcase",
+    "viewBox": [
+      1080,
+      660
+    ],
+    "views": [
+      {
+        "id": "capture",
+        "label": "Capture",
+        "focus": [
+          "forms",
+          "api",
+          "db"
+        ],
+        "note": "Records enter through typed forms and land in a single medical_records table (details as JSON text)."
+      },
+      {
+        "id": "retrieval",
+        "label": "Retrieve",
+        "focus": [
+          "db",
+          "retrieve",
+          "fast",
+          "prompt"
+        ],
+        "note": "Rule-based intent picks scope and filters; counts, next-due and lookups are exact SQL answers, otherwise a small evidence pack is built."
+      },
+      {
+        "id": "consume",
+        "label": "Answer & evaluate",
+        "focus": [
+          "prompt",
+          "model",
+          "fast",
+          "evals"
+        ],
+        "note": "Fast answers skip the model; the same retrieval feeds the live chat and the graded eval harness."
+      }
+    ]
+  },
+  "stages": [
+    {
+      "label": "Capture"
+    },
+    {
+      "label": "Store"
+    },
+    {
+      "label": "Retrieve"
+    },
+    {
+      "label": "Prompt"
+    },
+    {
+      "label": "Consume"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "forms",
+      "type": "frontend",
+      "label": "Record forms",
+      "sublabel": "visits/labs/Rx",
+      "stage": 0,
+      "row": 0,
+      "tag": "user input"
+    },
+    {
+      "id": "seed",
+      "type": "backend",
+      "label": "ensureSeed",
+      "sublabel": "Luna/Miso",
+      "stage": 0,
+      "row": 2,
+      "tag": "demo pets"
+    },
+    {
+      "id": "api",
+      "type": "backend",
+      "label": "CRUD routes",
+      "sublabel": "/api/pets /api/records",
+      "stage": 1,
+      "row": 0
+    },
+    {
+      "id": "db",
+      "type": "database",
+      "label": "medical_records",
+      "sublabel": "details = JSON text",
+      "stage": 1,
+      "row": 2,
+      "tag": "single table"
+    },
+    {
+      "id": "guard",
+      "type": "security",
+      "label": "Guardrail",
+      "sublabel": "regex refusals",
+      "stage": 2,
+      "row": 0,
+      "tag": "pre-model"
+    },
+    {
+      "id": "retrieve",
+      "type": "backend",
+      "label": "Retrieval",
+      "sublabel": "intent + evidence pack",
+      "stage": 2,
+      "row": 2,
+      "tag": "model-free"
+    },
+    {
+      "id": "prompt",
+      "type": "backend",
+      "label": "System prompt",
+      "sublabel": "evidence + few-shot",
+      "stage": 3,
+      "row": 1,
+      "tag": "exact-quote rule"
+    },
+    {
+      "id": "model",
+      "type": "backend",
+      "label": "Qwen2.5-0.5B",
+      "sublabel": "streamed answer",
+      "stage": 4,
+      "row": 0
+    },
+    {
+      "id": "chat",
+      "type": "frontend",
+      "label": "Chat UI",
+      "sublabel": "chat_messages",
+      "stage": 4,
+      "row": 1,
+      "tag": "SSE stream"
+    },
+    {
+      "id": "evals",
+      "type": "backend",
+      "label": "npm run evals",
+      "sublabel": "golden questions",
+      "stage": 4,
+      "row": 3,
+      "tag": "temp DB copy",
+      "yOffset": 40
+    },
+    {
+      "id": "fast",
+      "type": "backend",
+      "label": "Exact answer",
+      "sublabel": "count, due, lookup",
+      "stage": 3,
+      "row": 3,
+      "tag": "skips model"
+    }
+  ],
+  "flows": [
+    {
+      "id": "forms-api",
+      "from": "forms",
+      "to": "api",
+      "label": "submit"
+    },
+    {
+      "id": "api-db",
+      "from": "api",
+      "to": "db",
+      "label": "insert",
+      "labelAt": [
+        315,
+        200
+      ]
+    },
+    {
+      "id": "seed-db",
+      "from": "seed",
+      "to": "db",
+      "label": "demo rows"
+    },
+    {
+      "id": "db-retrieve",
+      "from": "db",
+      "to": "retrieve",
+      "label": "records",
+      "fromSide": "right",
+      "toSide": "left",
+      "labelAt": [
+        430,
+        420
+      ]
+    },
+    {
+      "id": "guard-prompt",
+      "from": "guard",
+      "to": "prompt",
+      "label": "in-scope"
+    },
+    {
+      "id": "retrieve-prompt",
+      "from": "retrieve",
+      "to": "prompt",
+      "label": "evidence lines"
+    },
+    {
+      "id": "prompt-model",
+      "from": "prompt",
+      "to": "model",
+      "label": "ChatML"
+    },
+    {
+      "id": "model-chat",
+      "from": "model",
+      "to": "chat",
+      "label": "answer",
+      "labelAt": [
+        960,
+        200
+      ]
+    },
+    {
+      "id": "retrieve-fast",
+      "from": "retrieve",
+      "to": "fast",
+      "label": "intent matched"
+    },
+    {
+      "id": "fast-chat",
+      "from": "fast",
+      "to": "chat",
+      "label": "exact answer"
+    }
+  ]
+}

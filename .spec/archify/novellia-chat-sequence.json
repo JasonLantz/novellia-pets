@@ -1,0 +1,175 @@
+{
+  "schema_version": 1,
+  "diagram_type": "sequence",
+  "meta": {
+    "title": "Nova Chat Request",
+    "quality_profile": "showcase",
+    "viewBox": [
+      1000,
+      580
+    ],
+    "views": [
+      {
+        "id": "guard",
+        "label": "Guardrail first",
+        "focus": [
+          "owner",
+          "route",
+          "core"
+        ],
+        "note": "Off-topic asks are refused deterministically before retrieval or the model is touched; the refusal still persists to history."
+      },
+      {
+        "id": "retrieve",
+        "label": "Retrieve",
+        "focus": [
+          "route",
+          "retrieval",
+          "db"
+        ],
+        "note": "Intent is parsed by rules; counts, next-due and profile lookups are answered exactly from SQL and skip the model."
+      },
+      {
+        "id": "answer",
+        "label": "Stream the answer",
+        "focus": [
+          "route",
+          "core",
+          "model",
+          "owner"
+        ],
+        "note": "Open questions get a small evidence pack in the prompt; tokens stream out and the answer is saved as chat history."
+      }
+    ]
+  },
+  "participants": [
+    {
+      "id": "owner",
+      "type": "external",
+      "label": "Owner",
+      "sublabel": "browser UI"
+    },
+    {
+      "id": "route",
+      "type": "backend",
+      "label": "/api/chat",
+      "sublabel": "route handler"
+    },
+    {
+      "id": "core",
+      "type": "backend",
+      "label": "chat-core",
+      "sublabel": "guardrail + prompt"
+    },
+    {
+      "id": "retrieval",
+      "type": "backend",
+      "label": "retrieval",
+      "sublabel": "intent + evidence"
+    },
+    {
+      "id": "db",
+      "type": "database",
+      "label": "Drizzle",
+      "sublabel": "records"
+    },
+    {
+      "id": "model",
+      "type": "backend",
+      "label": "Qwen2.5-0.5B",
+      "sublabel": "CPU"
+    }
+  ],
+  "segments": [
+    {
+      "from": 160,
+      "to": 240,
+      "label": "Guard"
+    },
+    {
+      "from": 258,
+      "to": 368,
+      "label": "Retrieve"
+    },
+    {
+      "from": 376,
+      "to": 504,
+      "label": "Generate"
+    }
+  ],
+  "messages": [
+    {
+      "from": "owner",
+      "to": "route",
+      "y": 170,
+      "label": "question + petId",
+      "variant": "emphasis"
+    },
+    {
+      "from": "route",
+      "to": "core",
+      "y": 198,
+      "label": "isOffTopic(text)"
+    },
+    {
+      "from": "core",
+      "to": "route",
+      "y": 226,
+      "label": "off-topic → canned refusal",
+      "variant": "return"
+    },
+    {
+      "from": "route",
+      "to": "retrieval",
+      "y": 272,
+      "label": "retrieve(question, petId)"
+    },
+    {
+      "from": "retrieval",
+      "to": "db",
+      "y": 300,
+      "label": "listRecords / countRecords"
+    },
+    {
+      "from": "db",
+      "to": "retrieval",
+      "y": 328,
+      "label": "rows",
+      "variant": "return"
+    },
+    {
+      "from": "retrieval",
+      "to": "route",
+      "y": 356,
+      "label": "fastAnswer or evidence lines",
+      "variant": "return"
+    },
+    {
+      "from": "route",
+      "to": "core",
+      "y": 392,
+      "label": "buildSystemPrompt(scope, lines)"
+    },
+    {
+      "from": "route",
+      "to": "model",
+      "y": 420,
+      "label": "streamChat(messages)",
+      "variant": "emphasis"
+    },
+    {
+      "from": "model",
+      "to": "route",
+      "y": 448,
+      "label": "token deltas",
+      "variant": "return"
+    },
+    {
+      "from": "route",
+      "to": "owner",
+      "y": 490,
+      "label": "SSE stream + save answer",
+      "variant": "return"
+    }
+  ]
+}

@@ -1,0 +1,127 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: novellia-pets
+  labels:
+    app.kubernetes.io/name: novellia-pets
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: novellia-pets
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: novellia-pets
+    spec:
+      containers:
+        - image: 192.168.0.25:5000/novellia-pets:latest
+          name: novellia-pets
+          # Pull a fresh :latest on every rollout so pushes are picked up.
+          imagePullPolicy: Always
+          env:
+            - name: PORT
+              value: "3300"
+            - name: HOSTNAME
+              value: "0.0.0.0"
+            - name: SQLITE_PATH
+              value: "/data/novellia.db"
+            # Match the q8_0 weights baked into the image (the Pi's Cortex-A72
+            # has no fp16 and SIGILLs on q4f16).
+            - name: MODEL_DTYPE
+              value: "q8_0"
+            # Warming at boot holds ~1.2GB resident; the Pi OOM-killed us.
+            # First chat pays a ~25s model load instead.
+            - name: WARM_MODEL
+              value: "0"
+          volumeMounts:
+            - name: data
+              mountPath: /data
+          # Model loads on first chat, so gate on /api/health, not the pages.
+          startupProbe:
+            httpGet:
+              path: /api/health
+              port: 3300
+            periodSeconds: 5
+            timeoutSeconds: 5
+            failureThreshold: 24
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: 3300
+            periodSeconds: 10
+            timeoutSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: 3300
+            initialDelaySeconds: 15
+            periodSeconds: 20
+            timeoutSeconds: 5
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "512Mi"
+            # Peak is first chat: model load (~1.1GB RSS) + inference.
+            limits:
+              cpu: "2"
+              memory: "3Gi"
+      volumes:
+        # sqlite lives here (no DATABASE_URL set => sqlite-on-PVC).
+        - name: data
+          persistentVolumeClaim:
+            claimName: novellia-pets-data
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: novellia-pets-data
+spec:
+  # k3s default class on the Pi.
+  storageClassName: local-path
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+
+---
+# Internal service for in-cluster access.
+apiVersion: v1
+kind: Service
+metadata:
+  name: novellia-pets
+  labels:
+    app.kubernetes.io/name: novellia-pets
+spec:
+  selector:
+    app.kubernetes.io/name: novellia-pets
+  ports:
+    - name: http
+      port: 3300
+      protocol: TCP
+      targetPort: 3300
+  type: ClusterIP
+
+---
+# Public entry: Cloudflare Tunnel (www.novellia-pets.com) ->
+# http://192.168.0.25:30080. Plain NodePort (not LoadBalancer) because k3s
+# svclb would bind hostPort 3300 and collide with other stacks on the box;
+# 30080 is free (others use 32177/30735/30876/31028/32698/30241).
+apiVersion: v1
+kind: Service
+metadata:
+  name: novellia-lb
+  labels:
+    app.kubernetes.io/name: novellia-pets
+spec:
+  selector:
+    app.kubernetes.io/name: novellia-pets
+  ports:
+    - name: http
+      port: 3300
+      protocol: TCP
+      targetPort: 3300
+      nodePort: 30080
+  type: NodePort

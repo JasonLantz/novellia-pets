@@ -1,0 +1,12 @@
+services:
+  app:
+    build: .
+    ports:
+      - "3000:3300"
+    environment:
+      - SQLITE_PATH=/data/novellia.db
+    volumes:
+      - novellia-data:/data
+
+volumes:
+  novellia-data:

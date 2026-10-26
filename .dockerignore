@@ -1,0 +1,11 @@
+.git
+.next
+node_modules
+data
+.models
+.spec
+.playwright-mcp
+*.db
+*.log
+Dockerfile
+docker-compose.yml
